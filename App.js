@@ -8,7 +8,9 @@ import {
   BackHandler,
   Keyboard,
   TouchableWithoutFeedback,
+  PermissionsAndroid,
 } from 'react-native';
+import Geolocation from '@react-native-community/geolocation'; // Importing Geolocation
 import MessageList from './components/MessageList';
 import Toolbar from './components/Toolbar';
 import {
@@ -143,13 +145,55 @@ export default class App extends React.Component {
     this.setState({ messages: [newImageMessage, ...messages] });
   };
 
-  handlePressToolbarLocation = () => {
+  handlePressToolbarLocation = async () => {
     const { messages } = this.state;
-    const newLocationMessage = createLocationMessage({
-      latitude: 14.619283,
-      longitude: 121.057715,
-    });
-    this.setState({ messages: [newLocationMessage, ...messages] });
+
+    const hasPermission = await this.requestLocationPermission();
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Location permission is required to use this feature.');
+      return;
+    }
+
+
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const {
+          coords: { latitude, longitude },
+        } = position;
+        this.setState({
+          messages: [
+            createLocationMessage({
+              latitude,
+              longitude,
+            }),
+            ...messages,
+          ],
+        });
+      },
+      (error) => {
+        Alert.alert('Error', 'Unable to fetch location. Please try again.');
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+    );
+  };
+
+  requestLocationPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'This app needs access to your location to send location messages.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
   };
 
   render() {
